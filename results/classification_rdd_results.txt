@@ -1,6 +1,0 @@
-Model: Logistic Regression (RDD API)
-Dataset: Credit Card Fraud
-Area Under ROC (AUC): 0.8106
-Accuracy: 0.9989
-Precision: 0.9988
-Recall: 0.9989

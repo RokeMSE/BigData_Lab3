@@ -1,8 +1,0 @@
-Model: Logistic Regression (DataFrame API)
-Dataset: Credit Card Fraud
-Area Under ROC (AUC): 0.9728
-Accuracy: 0.9991
-Precision: 0.9991
-Recall: 0.9991
-Intercept: -8.643003041662464
-Coefficients (first 5): [0.10001673549342802, 0.017184013629600668, 0.052624283174611895, 0.8952955587315936, 0.16561436221368173]

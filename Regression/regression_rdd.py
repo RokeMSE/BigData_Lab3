@@ -1,81 +1,128 @@
 import os
-import math
 from pyspark.sql import SparkSession
+from pyspark import SparkContext
 from pyspark.mllib.regression import LabeledPoint
 from pyspark.mllib.tree import DecisionTree
+from pyspark.mllib.evaluation import RegressionMetrics
+from pyspark.mllib.linalg import Vectors
+import datetime
+from io import StringIO
+import csv
 
-def save_results(results, output_path):
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-    with open(output_path, 'w') as f:
-        print(f"Saving results to {output_path}")
-        for key, value in results.items():
-            f.write(f"{key}: {value}\n")
-    print("Results saved successfully.")
+def parse_csv_line(line):
+    """
+    Uses the csv module to properly handle quoted fields.
+    """
+    try:
+        reader = csv.reader(StringIO(line))
+        return next(reader)
+    except StopIteration:
+        return None
 
-def run_regression_rdd_api(data_path):
-    print("Starting Regression with RDD API")
+def parse_row(cols):
+    """
+    Parses a list of strings from a CSV row into a structured tuple.
+    Returns (id, duration, features_vector) or None if parsing fails.
+    """
+    try:
+        id_ = cols[0]
+        vendor = float(cols[1])
+        pickup_dt = datetime.datetime.strptime(cols[2], "%Y-%m-%d %H:%M:%S")
+        pass_count = float(cols[4])
+        pick_long = float(cols[5])
+        pick_lat = float(cols[6])
+        drop_long = float(cols[7])
+        drop_lat = float(cols[8])
+        store_fwd = 1.0 if cols[9].strip().upper() == "Y" else 0.0
+        duration = float(cols[10])
+        
+        # Feature Engineering: Extract hour from pickup time
+        pickup_hour = float(pickup_dt.hour)
+        
+        features = [vendor, pass_count, pick_long, pick_lat, drop_long, drop_lat, pickup_hour, store_fwd]
+        return (id_, duration, Vectors.dense(features))
+    except (ValueError, IndexError):
+        # Skip malformed rows
+        return None
 
-    spark = SparkSession.builder \
-        .appName("NYC Taxi Regression RDD") \
-        .master("local[*]") \
-        .getOrCreate()
+def main():
+    """
+    Main function for the RDD-based regression task.
+    """
+    # Initialize Spark Session and Context
+    spark = SparkSession.builder.appName("Regression_RDD_MLlib_Fixed").getOrCreate()
+    sc = spark.sparkContext
 
-    df = spark.read.csv(data_path, header=True, inferSchema=True)
-    df = df.filter("passenger_count > 0 AND trip_duration > 60 AND trip_duration < 7200")
-    df = df.filter("pickup_longitude is not null and pickup_latitude is not null and dropoff_longitude is not null and dropoff_latitude is not null")
+    # --- Data Loading and Preparation ---
+    try:
+        lines = sc.textFile("./nyc-taxi-trip-duration/train/train.csv")
+        header = lines.first()
+        data = lines.filter(lambda line: line != header)
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        sc.stop()
+        return
 
-    def row_to_labeled_point(row):
-        label = float(row['trip_duration'])
-        features = [
-            float(row['passenger_count']),
-            float(row['pickup_longitude']),
-            float(row['pickup_latitude']),
-            float(row['dropoff_longitude']),
-            float(row['dropoff_latitude'])
-        ]
-        return LabeledPoint(label, features)
+    # Parse data and filter out any rows that failed parsing
+    parsed_data = data.map(parse_csv_line).filter(lambda x: x is not None)
+    rdd_data = parsed_data.map(parse_row).filter(lambda x: x is not None)
+    rdd_data.cache()
 
-    data_rdd = df.rdd.map(row_to_labeled_point)
-    train_rdd, test_rdd = data_rdd.randomSplit([0.8, 0.2], seed=42)
-    train_rdd.cache()
-    test_rdd.cache()
+    # --- Data Splitting ---
+    # Perform a single split to ensure train and test sets are perfectly aligned
+    train_full_rdd, test_full_rdd = rdd_data.randomSplit([0.8, 0.2], seed=42)
 
-    model = DecisionTree.trainRegressor(
-        train_rdd,
-        categoricalFeaturesInfo={},
-        impurity="variance",
-        maxDepth=5,
-        maxBins=32
-    )
+    # Create LabeledPoint RDD for training
+    train_rdd = train_full_rdd.map(lambda x: LabeledPoint(x[1], x[2]))
 
-    predictions = model.predict(test_rdd.map(lambda x: x.features))
-    labels_and_predictions = test_rdd.map(lambda lp: lp.label).zip(predictions)
+    # --- Model Training ---
+    model = DecisionTree.trainRegressor(train_rdd, categoricalFeaturesInfo={}, 
+                                        impurity="variance", maxDepth=5)
+
+    # --- Model Prediction (Serialization-Safe Method) ---
+    # 1. Extract just the features from the test set
+    test_features_rdd = test_full_rdd.map(lambda x: x[2])
     
-    mse = labels_and_predictions.map(lambda lp: (lp[0] - lp[1])**2).mean()
-    rmse = math.sqrt(mse)
+    # 2. Use model.predict on the RDD of features. This is the correct way.
+    predictions_rdd = model.predict(test_features_rdd)
+
+    # 3. Zip the original test data with the predictions
+    # The result is an RDD of ((id, label, features), prediction)
+    results_zipped_rdd = test_full_rdd.zip(predictions_rdd)
+
+    # Map to a more convenient format for DataFrame creation and evaluation
+    results_rdd = results_zipped_rdd.map(lambda p: {
+        "id": p[0][0],
+        "label": p[0][1],
+        "prediction": p[1],
+        "residual": p[0][1] - p[1]
+    })
     
-    mean_label = test_rdd.map(lambda lp: lp.label).mean()
-    ss_total = test_rdd.map(lambda lp: (lp.label - mean_label) ** 2).sum()
-    ss_res = labels_and_predictions.map(lambda lp: (lp[0] - lp[1]) ** 2).sum()
-    r2 = 1 - (ss_res / ss_total) if ss_total != 0 else float('nan')
-    
-    # Results
-    print("\n--- Evaluation Metrics ---")
-    print(f"Root Mean Squared Error (RMSE): {rmse:.4f}")
-    print(f"R2 Score: {r2:.4f}")
+    # --- Evaluation ---
+    # Create an RDD of (prediction, label) for the metrics evaluator
+    preds_and_labels = results_zipped_rdd.map(lambda p: (p[1], p[0][1]))
+    metrics = RegressionMetrics(preds_and_labels)
 
-    results_dict = {
-        "Model": "Decision Tree Regressor (RDD API)",
-        "Dataset": "NYC Taxi Trip Duration",
-        "Root Mean Squared Error (RMSE)": f"{rmse:.4f}",
-        "R2 Score": f"{r2:.4f}"
-    }
-    save_results(results_dict, "results/regression_rdd_results.txt")
+    print("--- Evaluation Metrics ---")
+    print(f"RMSE: {metrics.rootMeanSquaredError}")
+    print(f"R²: {metrics.r2}")
+    print(f"MAE: {metrics.meanAbsoluteError}")
+    print("--------------------------")
 
-    # REMEMBER TO STOP
-    spark.stop()
+    # --- Save Results ---
+    output_dir = "Results"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
+    # Convert to DataFrame and save as a single CSV file
+    try:
+        df = spark.createDataFrame(results_rdd)
+        df.coalesce(1).write.csv("Results/Regression_RDD_MLlib.csv", header=True, mode="overwrite")
+        print("Successfully saved predictions to Results/Regression_RDD_MLlib.csv")
+    except Exception as e:
+        print(f"Error saving results to CSV: {e}")
+
+    sc.stop()
 
 if __name__ == "__main__":
-    TAXI_DATA_PATH = "./nyc-taxi-trip-duration/train/train.csv"
-    run_regression_rdd_api(TAXI_DATA_PATH)
+    main()

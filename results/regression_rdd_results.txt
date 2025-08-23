@@ -1,4 +1,0 @@
-Model: Decision Tree Regressor (RDD API)
-Dataset: NYC Taxi Trip Duration
-Root Mean Squared Error (RMSE): 497.1998
-R2 Score: 0.4206
