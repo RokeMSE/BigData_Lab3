@@ -1,0 +1,102 @@
+Model: Decision Tree Regressor (DataFrame API)
+Dataset: NYC Taxi Trip Duration
+Root Mean Squared Error (RMSE): 388.1028
+R-squared (R²): 0.6367
+Feature Importances: (41,[7,10,17,31,36,37,38,39,40],[0.005994608792231398,0.005839172133773806,0.006157019375928763,0.0017621185293452757,0.9627031525646084,0.0007324550939278132,0.00024032844567121369,0.0003627326467112279,0.016208412417802114])
+Decision Tree Model Structure:
+DecisionTreeRegressionModel: uid=DecisionTreeRegressor_64cb3a315f96, depth=5, numNodes=63, numFeatures=41
+  If (feature 36 <= 4.236717516153675)
+   If (feature 36 <= 1.8582959506434689)
+    If (feature 36 <= 1.1658681906570862)
+     If (feature 36 <= 0.9003235691723799)
+      If (feature 40 <= 40.76926040649414)
+       Predict: 339.875802083144
+      Else (feature 40 > 40.76926040649414)
+       Predict: 256.021661237785
+     Else (feature 36 > 0.9003235691723799)
+      If (feature 40 <= 40.76926040649414)
+       Predict: 437.2915073419239
+      Else (feature 40 > 40.76926040649414)
+       Predict: 320.47472593098155
+    Else (feature 36 > 1.1658681906570862)
+     If (feature 40 <= 40.76926040649414)
+      If (feature 36 <= 1.5256698573254752)
+       Predict: 530.1183820395876
+      Else (feature 36 > 1.5256698573254752)
+       Predict: 631.85078994928
+     Else (feature 40 > 40.76926040649414)
+      If (feature 36 <= 1.5256698573254752)
+       Predict: 394.2415526675787
+      Else (feature 36 > 1.5256698573254752)
+       Predict: 482.96980328773606
+   Else (feature 36 > 1.8582959506434689)
+    If (feature 36 <= 2.9518632228467188)
+     If (feature 40 <= 40.77435493469238)
+      If (feature 36 <= 2.3991629971858597)
+       Predict: 729.4672710456513
+      Else (feature 36 > 2.3991629971858597)
+       Predict: 846.3510667976662
+     Else (feature 40 > 40.77435493469238)
+      If (feature 36 <= 2.3991629971858597)
+       Predict: 579.4008724808018
+      Else (feature 36 > 2.3991629971858597)
+       Predict: 697.8087444255436
+    Else (feature 36 > 2.9518632228467188)
+     If (feature 40 <= 40.780921936035156)
+      If (feature 31 in {1.0})
+       Predict: 855.4159056100743
+      Else (feature 31 not in {1.0})
+       Predict: 1023.7240484019217
+     Else (feature 40 > 40.780921936035156)
+      If (feature 38 <= 40.753929138183594)
+       Predict: 1002.0616937745373
+      Else (feature 38 > 40.753929138183594)
+       Predict: 788.8186428532055
+  Else (feature 36 > 4.236717516153675)
+   If (feature 36 <= 13.60539362757515)
+    If (feature 36 <= 7.613980779284751)
+     If (feature 36 <= 5.345300872912574)
+      If (feature 40 <= 40.7922306060791)
+       Predict: 1193.8898037645174
+      Else (feature 40 > 40.7922306060791)
+       Predict: 943.2308189307058
+     Else (feature 36 > 5.345300872912574)
+      If (feature 40 <= 40.7922306060791)
+       Predict: 1377.1399334237456
+      Else (feature 40 > 40.7922306060791)
+       Predict: 1157.000100857287
+    Else (feature 36 > 7.613980779284751)
+     If (feature 40 <= 40.785430908203125)
+      If (feature 36 <= 9.422904453412983)
+       Predict: 1658.157770712549
+      Else (feature 36 > 9.422904453412983)
+       Predict: 1948.2695307505435
+     Else (feature 40 > 40.785430908203125)
+      If (feature 7 in {0.0})
+       Predict: 1455.035192345501
+      Else (feature 7 not in {0.0})
+       Predict: 2023.4689507494647
+   Else (feature 36 > 13.60539362757515)
+    If (feature 17 in {0.0})
+     If (feature 10 in {0.0})
+      If (feature 7 in {0.0})
+       Predict: 2424.1050788643533
+      Else (feature 7 not in {0.0})
+       Predict: 3311.1782778018173
+     Else (feature 10 not in {0.0})
+      If (feature 37 <= -73.9590950012207)
+       Predict: 3629.21101992966
+      Else (feature 37 > -73.9590950012207)
+       Predict: 3237.937939859245
+    Else (feature 17 not in {0.0})
+     If (feature 37 <= -73.96232986450195)
+      If (feature 31 in {1.0})
+       Predict: 2967.8582089552237
+      Else (feature 31 not in {1.0})
+       Predict: 3977.75
+     Else (feature 37 > -73.96232986450195)
+      If (feature 39 <= -73.95708084106445)
+       Predict: 3442.366556836903
+      Else (feature 39 > -73.95708084106445)
+       Predict: 2838.3210784313724
+
