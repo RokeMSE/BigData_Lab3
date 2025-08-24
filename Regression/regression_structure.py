@@ -1,4 +1,3 @@
-# src/Regression/Structured_API/regression_structured.py
 from pyspark.sql import SparkSession
 from pyspark.ml.feature import VectorAssembler, StringIndexer
 from pyspark.ml.regression import DecisionTreeRegressor
@@ -50,9 +49,12 @@ rmse_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", me
 rmse = rmse_eval.evaluate(predictions)
 r2_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="r2")
 r2 = r2_eval.evaluate(predictions)
+mae_eval = RegressionEvaluator(labelCol="label", predictionCol="prediction", metricName="mae")
+mae = mae_eval.evaluate(predictions)
 
 print(f"RMSE: {rmse}")
 print(f"R2: {r2}")
+print(f"MAE: {mae}")
 
 # Export predictions
 preds = predictions.select("id", "label", "prediction", (col("label") - col("prediction")).alias("residual"))
@@ -64,5 +66,6 @@ preds.coalesce(1).write.csv("Results/Regression_Structured.csv", header=True, mo
 with open("Results/Regression_Structured_metrics.txt", "w") as f:
     f.write(f"RMSE: {rmse}\n")
     f.write(f"R2: {r2}\n")
+    f.write(f"MAE: {mae}\n")
 
 spark.stop()

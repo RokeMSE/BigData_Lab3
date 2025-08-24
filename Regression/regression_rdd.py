@@ -10,9 +10,6 @@ from io import StringIO
 import csv
 
 def parse_csv_line(line):
-    """
-    Uses the csv module to properly handle quoted fields.
-    """
     try:
         reader = csv.reader(StringIO(line))
         return next(reader)
@@ -20,10 +17,6 @@ def parse_csv_line(line):
         return None
 
 def parse_row(cols):
-    """
-    Parses a list of strings from a CSV row into a structured tuple.
-    Returns (id, duration, features_vector) or None if parsing fails.
-    """
     try:
         id_ = cols[0]
         vendor = float(cols[1])
@@ -46,14 +39,11 @@ def parse_row(cols):
         return None
 
 def main():
-    """
-    Main function for the RDD-based regression task.
-    """
     # Initialize Spark Session and Context
     spark = SparkSession.builder.appName("Regression_RDD_MLlib_Fixed").getOrCreate()
     sc = spark.sparkContext
 
-    # --- Data Loading and Preparation ---
+    # Data Loading and Prep
     try:
         lines = sc.textFile("./nyc-taxi-trip-duration/train/train.csv")
         header = lines.first()
@@ -68,18 +58,18 @@ def main():
     rdd_data = parsed_data.map(parse_row).filter(lambda x: x is not None)
     rdd_data.cache()
 
-    # --- Data Splitting ---
+    # Data Splitting
     # Perform a single split to ensure train and test sets are perfectly aligned
     train_full_rdd, test_full_rdd = rdd_data.randomSplit([0.8, 0.2], seed=42)
 
     # Create LabeledPoint RDD for training
     train_rdd = train_full_rdd.map(lambda x: LabeledPoint(x[1], x[2]))
 
-    # --- Model Training ---
+    # Training
     model = DecisionTree.trainRegressor(train_rdd, categoricalFeaturesInfo={}, 
                                         impurity="variance", maxDepth=5)
 
-    # --- Model Prediction (Serialization-Safe Method) ---
+    # Model Prediction
     # 1. Extract just the features from the test set
     test_features_rdd = test_full_rdd.map(lambda x: x[2])
     
@@ -90,7 +80,7 @@ def main():
     # The result is an RDD of ((id, label, features), prediction)
     results_zipped_rdd = test_full_rdd.zip(predictions_rdd)
 
-    # Map to a more convenient format for DataFrame creation and evaluation
+    # Mapping for DataFrame creation and evaluation
     results_rdd = results_zipped_rdd.map(lambda p: {
         "id": p[0][0],
         "label": p[0][1],
@@ -98,7 +88,7 @@ def main():
         "residual": p[0][1] - p[1]
     })
     
-    # --- Evaluation ---
+    # Evaluation
     # Create an RDD of (prediction, label) for the metrics evaluator
     preds_and_labels = results_zipped_rdd.map(lambda p: (p[1], p[0][1]))
     metrics = RegressionMetrics(preds_and_labels)
@@ -109,7 +99,6 @@ def main():
     print(f"MAE: {metrics.meanAbsoluteError}")
     print("--------------------------")
 
-    # --- Save Results ---
     output_dir = "Results"
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)

@@ -1,9 +1,3 @@
-# Note: This is a complete PySpark script for the Classification task using RDD-MLlib (spark.mllib).
-# Run this in a PySpark environment.
-# Assumptions: creditcard.csv is in the current directory.
-# Output: Saves predictions to Results/Classification_RDD_MLlib.csv
-# Also prints evaluation metrics.
-
 from pyspark import SparkContext
 from pyspark.mllib.regression import LabeledPoint
 from pyspark.mllib.classification import LogisticRegressionWithLBFGS
@@ -39,14 +33,19 @@ rdd_data = parsed.map(lambda cols: (cols[0], cols[29], cols[30], Vectors.dense(c
 # Create LabeledPoint: label=Class, features
 labeled_rdd = rdd_data.map(lambda x: LabeledPoint(x[2], x[3]))
 
-# Split data properly
+# Split data properly for train and test (80-20 beacause holy ratio)
+# The seed ensures that both splits are consistent
 train_rdd, test_rdd = labeled_rdd.randomSplit([0.8, 0.2], seed=42)
 
-# Also split the full data to maintain correspondence
+# Also split the full data to maintain correspondence for the final output
 full_train_rdd, full_test_rdd = rdd_data.randomSplit([0.8, 0.2], seed=42)
 
 # Train model
 model = LogisticRegressionWithLBFGS.train(train_rdd, iterations=100)
+
+# Print model coefficients and intercept
+print("Model Weights (Coefficients): \n" + str(model.weights))
+print("Model Intercept: " + str(model.intercept))
 
 # Clear threshold to get probabilities
 model.clearThreshold()
@@ -57,7 +56,8 @@ probs = test_features.map(lambda features: model.predict(features))
 preds = probs.map(lambda p: 1.0 if p > 0.5 else 0.0)
 
 # Create results by zipping with full test data
-# Fixed lambda syntax for Python 3
+# This is correct because full_test_rdd and test_rdd were split with the same seed,
+# ensuring a one-to-one correspondence between the original data and the test features/labels.
 results_rdd = full_test_rdd.zip(probs).zip(preds).map(
     lambda x: (x[0][0][0], x[0][0][1], x[0][0][2], x[1], x[0][1])
 )
@@ -76,12 +76,21 @@ scores_and_labels = probs.zip(test_labels)
 binary_metrics = BinaryClassificationMetrics(scores_and_labels)
 print("AUC:", binary_metrics.areaUnderROC)
 
-# For multiclass metrics (needs (prediction, label) format)  
+# For multiclass metrics (needs (prediction, label) format)
 preds_and_labels = preds.zip(test_labels)
 multi_metrics = MulticlassMetrics(preds_and_labels)
 print("Accuracy:", multi_metrics.accuracy)
 print("Precision:", multi_metrics.weightedPrecision)
 print("Recall:", multi_metrics.weightedRecall)
+
+# Export metrics to a text file
+with open("Results/Classification_RDD_metrics.txt", "w") as f:
+    f.write(f"Model Weights: {model.weights}\n")
+    f.write(f"Model Intercept: {model.intercept}\n")
+    f.write(f"AUC: {binary_metrics.areaUnderROC}\n")
+    f.write(f"Accuracy: {multi_metrics.accuracy}\n")
+    f.write(f"Precision: {multi_metrics.weightedPrecision}\n")
+    f.write(f"Recall: {multi_metrics.weightedRecall}\n")
 
 # Reset threshold and stop
 model.setThreshold(0.5)
